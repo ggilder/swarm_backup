@@ -4,31 +4,8 @@ import Foundation
 
 struct Credentials: Decodable {
     let wsid: String
-    let oauthToken: String
-    let userId: String
-}
-
-struct CheckinResponse: Decodable {
-    let response: CheckinData
-}
-
-struct CheckinData: Decodable {
-    let checkins: Checkins
-}
-
-struct Checkins: Decodable {
-    let count: Int
-    let items: [CheckinItem]
-}
-
-struct CheckinItem: Decodable {
-    let createdAt: TimeInterval
-    let timeZoneOffset: Int
-    let venue: Venue
-}
-
-struct Venue: Decodable {
-    let name: String
+    let oauth_token: String
+    let user_id: String
 }
 
 // MARK: - Main
@@ -41,13 +18,13 @@ func main() {
     }
 
     let outputDirectory = getOutputDirectory()
-    let baseURL = "https://api.foursquare.com/v2/users/\(credentials.userId)/checkins?locale=en&explicit-lang=false&v=20231221&offset=%d&limit=50&m=swarm&clusters=false&wsid=\(credentials.wsid)&oauth_token=\(credentials.oauthToken)"
+    let baseURL = "https://api.foursquare.com/v2/users/\(credentials.user_id)/checkins?locale=en&explicit-lang=false&v=20231221&offset=%d&limit=50&m=swarm&clusters=false&wsid=\(credentials.wsid)&oauth_token=\(credentials.oauth_token)"
 
     var offset = 0
 
-    while true {
-        guard let checkinData = fetchCheckinData(urlString: String(format: baseURL, offset)),
-              let items = checkinData.response.checkins.items,
+    // Temp for testing
+    while true && offset < 50 {
+        guard let items = fetchCheckinData(urlString: String(format: baseURL, offset)),
               !items.isEmpty else {
             break
         }
@@ -62,15 +39,18 @@ func main() {
 
 // MARK: - Networking
 
-func fetchCheckinData(urlString: String) -> CheckinResponse? {
+func fetchCheckinData(urlString: String) -> [[String: Any]]? {
     guard let url = URL(string: urlString),
           let data = try? Data(contentsOf: url),
-          let checkinData = try? JSONDecoder().decode(CheckinResponse.self, from: data) else {
+          let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+          let response = json["response"] as? [String: Any],
+          let checkins = response["checkins"] as? [String: Any],
+          let items = checkins["items"] as? [[String: Any]] else {
         print("Error fetching or decoding checkin data from \(urlString).")
         return nil
     }
 
-    return checkinData
+    return items
 }
 
 // MARK: - File Handling
@@ -88,15 +68,24 @@ func getOutputDirectory() -> String {
 func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd HHmm"
-    dateFormatter.timeZone = TimeZone(secondsFromGMT: item["timeZoneOffset"] as! Int * 60)
 
-    let localDate = dateFormatter.string(from: Date(timeIntervalSince1970: item["createdAt"] as! TimeInterval))
-    let fileName = "\(localDate) \(item["venue"]!["name"] as! String).json"
+    let createdAt = item["createdAt"] as! TimeInterval
+    let timeZoneOffset = item["timeZoneOffset"] as! Int
+    dateFormatter.timeZone = TimeZone(secondsFromGMT: timeZoneOffset * 60)
+
+    let localDate = dateFormatter.string(from: Date(timeIntervalSince1970: createdAt))
+
+    var venueName = ""
+    if let venue = item["venue"] as? [String: Any], let name = venue["name"] as? String {
+        venueName = name
+    }
+
+    let fileName = "\(localDate) \(venueName).json"
     let filePath = (outputDirectory as NSString).appendingPathComponent(fileName)
 
     do {
         let itemData = try JSONSerialization.data(withJSONObject: item, options: .prettyPrinted)
-        try itemData.write(to: URL(fileURLWithPath: filePath), options: .atomicWrite)
+        try itemData.write(to: URL(fileURLWithPath: filePath), options: .atomic)
     } catch {
         print("Error writing checkin item to file: \(error)")
     }
