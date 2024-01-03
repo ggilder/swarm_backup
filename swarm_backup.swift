@@ -1,6 +1,6 @@
 /*
 TODO:
-- Have script only request checkins newer than most recent one in output folder?
+- Have script only request checkins newer than most recent one in output folder
 - Could potentially winnow down output keys a bit
 - Or save some jq scripts ("views?") to display the essentials from checkin files
 */
@@ -30,14 +30,20 @@ func main() {
     var offset = 0
 
     // Temp for testing
-    while true && offset < 50 {
+    while true {
+        print("Fetching checkins at offset \(offset)")
         guard let items = fetchCheckinData(urlString: String(format: baseURL, offset)),
               !items.isEmpty else {
             break
         }
 
         for item in items {
-            saveCheckinItem(item, to: outputDirectory)
+            do {
+                try saveCheckinItem(item, to: outputDirectory)
+            } catch {
+                print("Error encountered while saving checkin item: \(error)")
+                exit(1)
+            }
         }
 
         offset += items.count
@@ -72,7 +78,7 @@ func getOutputDirectory() -> String {
     return arguments[outputIndex + 1]
 }
 
-func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) {
+func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) throws {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd HHmm"
 
@@ -84,7 +90,8 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) {
 
     var venueName = ""
     if let venue = item["venue"] as? [String: Any], let name = venue["name"] as? String {
-        venueName = name
+        // Replace colon and slash with underscores in the venue name
+        venueName = name.replacingOccurrences(of: #"[/:]"#, with: "_", options: .regularExpression)
     }
 
     let fileName = "\(localDate) \(venueName).json"
@@ -94,7 +101,7 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) {
         let itemData = try JSONSerialization.data(withJSONObject: item, options: [.prettyPrinted, .sortedKeys])
         try itemData.write(to: URL(fileURLWithPath: filePath), options: .atomic)
     } catch {
-        print("Error writing checkin item to file: \(error)")
+        throw error
     }
 }
 
