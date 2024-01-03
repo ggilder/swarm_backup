@@ -1,6 +1,6 @@
 /*
 TODO:
-- Have script only request checkins newer than most recent one in output folder
+- Have script only request checkins newer than most recent one in output folder (use afterTimestamp query param)
 - Could potentially winnow down output keys a bit
 - Or save some jq scripts ("views?") to display the essentials from checkin files
 */
