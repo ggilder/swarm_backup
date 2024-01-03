@@ -1,3 +1,10 @@
+/*
+TODO:
+- Have script only request checkins newer than most recent one in output folder?
+- Could potentially winnow down output keys a bit
+- Or save some jq scripts ("views?") to display the essentials from checkin files
+*/
+
 import Foundation
 
 // MARK: - Model
@@ -84,7 +91,7 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) {
     let filePath = (outputDirectory as NSString).appendingPathComponent(fileName)
 
     do {
-        let itemData = try JSONSerialization.data(withJSONObject: item, options: .prettyPrinted)
+        let itemData = try JSONSerialization.data(withJSONObject: item, options: [.prettyPrinted, .sortedKeys])
         try itemData.write(to: URL(fileURLWithPath: filePath), options: .atomic)
     } catch {
         print("Error writing checkin item to file: \(error)")
