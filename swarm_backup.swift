@@ -1,10 +1,3 @@
-/*
-TODO:
-- Have script only request checkins newer than most recent one in output folder (use afterTimestamp query param)
-- Could potentially winnow down output keys a bit
-- Or save some jq scripts ("views?") to display the essentials from checkin files
-*/
-
 import Foundation
 
 // MARK: - Model
@@ -27,12 +20,22 @@ func main() {
     let outputDirectory = getOutputDirectory()
     let baseURL = "https://api.foursquare.com/v2/users/\(credentials.user_id)/checkins?locale=en&explicit-lang=false&v=20231221&offset=%d&limit=50&m=swarm&clusters=false&wsid=\(credentials.wsid)&oauth_token=\(credentials.oauth_token)"
 
+    var fullURL = baseURL
+
+    // Get the latest file in the output directory
+    if let latestFile = getLatestFile(in: outputDirectory),
+       let createdAtTimestamp = getTimestamp(from: latestFile) {
+        let afterTimestampParameter = "&afterTimestamp=\(Int(createdAtTimestamp))"
+        fullURL += afterTimestampParameter
+        print("Querying URL with afterTimestamp parameter:", createdAtTimestamp)
+    }
+
+    // Continue with the rest of the script
     var offset = 0
 
-    // Temp for testing
     while true {
         print("Fetching checkins at offset \(offset)")
-        guard let items = fetchCheckinData(urlString: String(format: baseURL, offset)),
+        guard let items = fetchCheckinData(urlString: String(format: fullURL, offset)),
               !items.isEmpty else {
             break
         }
@@ -103,6 +106,32 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) throws {
     } catch {
         throw error
     }
+}
+
+// MARK: - Utility Functions
+
+func getLatestFile(in directory: String) -> String? {
+    guard let fileURLs = try? FileManager.default.contentsOfDirectory(atPath: directory) else {
+        return nil
+    }
+
+    return fileURLs
+        .filter { $0.hasSuffix(".json") }
+        .sorted { $0.lexicographicallyPrecedes($1) }
+        .last
+}
+
+func getTimestamp(from fileName: String) -> TimeInterval? {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd HHmm"
+
+    // Extract timestamp from file name
+    if let range = fileName.range(of: "\\d{4}-\\d{2}-\\d{2} \\d{4}", options: .regularExpression) {
+        let timestampString = fileName[range].trimmingCharacters(in: .whitespacesAndNewlines)
+        return dateFormatter.date(from: timestampString)?.timeIntervalSince1970
+    }
+
+    return nil
 }
 
 // Run the script
