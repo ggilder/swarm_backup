@@ -96,6 +96,7 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) throws {
         // Replace colon and slash with underscores in the venue name
         venueName = name.replacingOccurrences(of: #"[/:]"#, with: "_", options: .regularExpression)
     }
+    venueName = venueName.decomposedStringWithCanonicalMapping
 
     let fileName = "\(localDate) \(venueName).json"
     let filePath = (outputDirectory as NSString).appendingPathComponent(fileName)
