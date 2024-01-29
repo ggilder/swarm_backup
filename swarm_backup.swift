@@ -85,6 +85,8 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) throws {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-MM-dd HHmm"
 
+    let baseURL = URL(fileURLWithPath: outputDirectory, isDirectory: true)
+
     let createdAt = item["createdAt"] as! TimeInterval
     let timeZoneOffset = item["timeZoneOffset"] as! Int
     dateFormatter.timeZone = TimeZone(secondsFromGMT: timeZoneOffset * 60)
@@ -96,14 +98,14 @@ func saveCheckinItem(_ item: [String: Any], to outputDirectory: String) throws {
         // Replace colon and slash with underscores in the venue name
         venueName = name.replacingOccurrences(of: #"[/:]"#, with: "_", options: .regularExpression)
     }
-    venueName = venueName.decomposedStringWithCanonicalMapping
 
     let fileName = "\(localDate) \(venueName).json"
-    let filePath = (outputDirectory as NSString).appendingPathComponent(fileName)
 
     do {
         let itemData = try JSONSerialization.data(withJSONObject: item, options: [.prettyPrinted, .sortedKeys])
-        try itemData.write(to: URL(fileURLWithPath: filePath), options: .atomic)
+        // Just remove accents because constructing a URL will not respect Unicode Normalization Forms :/
+        let itemURL = URL(fileURLWithPath: fileName.folding(options: .diacriticInsensitive, locale: .current), relativeTo: baseURL)
+        try itemData.write(to: itemURL, options: .atomic)
     } catch {
         throw error
     }
